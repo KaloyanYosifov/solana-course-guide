@@ -54,12 +54,12 @@ describe("anchor-student-intro-program", () => {
     await program.methods.introduce(student.name, student.introduction).rpc();
 
     let userAta = await getAccount(provider.connection, tokenAccount);
-    expect(Number(userAta.amount)).to.equal((30 * 10) ^ 6);
+    expect(Number(userAta.amount)).to.equal(30 * 10 ** 6);
 
     await program.methods.introduce(student2.name, student2.introduction).rpc();
 
     userAta = await getAccount(provider.connection, tokenAccount);
-    expect(Number(userAta.amount)).to.equal(596);
+    expect(Number(userAta.amount)).to.equal(60 * 10 ** 6);
 
     const studentAccount = await program.account.studentAccountState.fetch(
       studentPda

@@ -59,7 +59,7 @@ pub mod anchor_student_intro_program {
                 },
                 &[&["student_mint".as_bytes(), &[ctx.bumps.mint]]],
             ),
-            (30 * 10) ^ 6,
+            30 * 10u64.pow(6),
         )?;
 
         msg!("Token minted!");
