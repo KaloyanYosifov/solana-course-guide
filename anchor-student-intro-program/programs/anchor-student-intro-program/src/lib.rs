@@ -1,4 +1,8 @@
 use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token::{Mint, Token, TokenAccount},
+};
 
 declare_id!("Ckq8b1Z1QwHNmJ9FmVLGwBxFAFALiaqvY3NrhHTFuePt");
 
@@ -22,7 +26,15 @@ fn validate(name: impl AsRef<str>, introduction: impl AsRef<str>) -> Result<()> 
 
 #[program]
 pub mod anchor_student_intro_program {
+    use anchor_spl::token::{mint_to, MintTo};
+
     use super::*;
+
+    pub fn init_mint(_ctx: Context<InitMint>) -> Result<()> {
+        msg!("Mint initialized!");
+
+        Ok(())
+    }
 
     pub fn introduce(ctx: Context<Introduce>, name: String, introduction: String) -> Result<()> {
         msg!("Validating!...");
@@ -35,7 +47,22 @@ pub mod anchor_student_intro_program {
         student.name = name;
         student.introduction = introduction;
 
-        msg!("Student Account created!");
+        msg!("Student Account created! Minting token!");
+
+        mint_to(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                MintTo {
+                    authority: ctx.accounts.initiator.to_account_info(),
+                    to: ctx.accounts.token_account.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                },
+                &[&["student_mint".as_bytes(), &[ctx.bumps.mint]]],
+            ),
+            (30 * 10) ^ 6,
+        )?;
+
+        msg!("Token minted!");
 
         Ok(())
     }
@@ -65,6 +92,23 @@ pub mod anchor_student_intro_program {
 }
 
 #[derive(Accounts)]
+pub struct InitMint<'a> {
+    #[account(
+        init,
+        seeds = ["student_mint".as_bytes()],
+        bump,
+        payer = initiator,
+        mint::decimals = 6,
+        mint::authority = initiator
+    )]
+    pub mint: Account<'a, Mint>,
+    #[account(mut)]
+    pub initiator: Signer<'a>,
+    pub token_program: Program<'a, Token>,
+    pub system_program: Program<'a, System>,
+}
+
+#[derive(Accounts)]
 #[instruction(name: String)]
 pub struct Introduce<'a> {
     #[account(
@@ -75,9 +119,28 @@ pub struct Introduce<'a> {
         payer = initiator,
     )]
     pub student: Account<'a, StudentAccountState>,
+
+    #[account(
+        mut,
+        seeds = ["student_mint".as_bytes()],
+        bump,
+    )]
+    pub mint: Account<'a, Mint>,
+
     #[account(mut)]
     pub initiator: Signer<'a>,
+
+    #[account(
+        init_if_needed,
+        payer = initiator,
+        associated_token::mint = mint,
+        associated_token::authority = initiator,
+    )]
+    pub token_account: Account<'a, TokenAccount>,
+
+    pub token_program: Program<'a, Token>,
     pub system_program: Program<'a, System>,
+    pub associated_token_program: Program<'a, AssociatedToken>,
 }
 
 #[derive(Accounts)]

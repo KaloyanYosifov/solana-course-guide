@@ -2,6 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { AnchorStudentIntroProgram } from "../target/types/anchor_student_intro_program";
 import { expect } from "chai";
+import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
 
 describe("anchor-student-intro-program", () => {
   // Configure the client to use the local cluster.
@@ -34,11 +35,31 @@ describe("anchor-student-intro-program", () => {
     ],
     program.programId
   );
+  const [mint] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("student_mint")],
+    program.programId
+  );
+
+  it("initializes the token", async () => {
+    await program.methods.initMint().rpc();
+  });
 
   it("creates a student account with an introduction", async () => {
+    const tokenAccount = await getAssociatedTokenAddress(
+      mint,
+      provider.wallet.publicKey
+    );
+
     // Add your test here.
     await program.methods.introduce(student.name, student.introduction).rpc();
+
+    let userAta = await getAccount(provider.connection, tokenAccount);
+    expect(Number(userAta.amount)).to.equal((30 * 10) ^ 6);
+
     await program.methods.introduce(student2.name, student2.introduction).rpc();
+
+    userAta = await getAccount(provider.connection, tokenAccount);
+    expect(Number(userAta.amount)).to.equal(596);
 
     const studentAccount = await program.account.studentAccountState.fetch(
       studentPda
