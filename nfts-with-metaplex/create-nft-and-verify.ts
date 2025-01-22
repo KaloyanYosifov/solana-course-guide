@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import {
   createNft,
+  findMetadataPda,
   mplTokenMetadata,
+  verifyCollectionV1,
 } from "@metaplex-foundation/mpl-token-metadata";
 import {
   createGenericFile,
@@ -36,8 +38,8 @@ const nftCollection = UMIPublicKey(process.env.COLLECTION_NFT_ADDRESS);
 console.log(`NFT Collection address: ${process.env.COLLECTION_NFT_ADDRESS}`);
 
 const nftData = {
-    name: 'Damn Carmen #1',
-    symbol: 'DC1',
+    name: 'Damn Carmen #3',
+    symbol: 'DC3',
     description: 'First nft token of Damn Carmen collection',
     sellerFeeBasisPoints: percentAmount(0),
 };
@@ -59,7 +61,7 @@ console.log(`NFT JSON URI: ${nftDataUri}`);
 const nftTokenMintKeypair = generateSigner(umi);
 
 // create and mint NFT
-const transaction = createNft(umi, {
+let createNftTransaction = createNft(umi, {
   mint: nftTokenMintKeypair,
   name: nftData.name,
   symbol: nftData.symbol,
@@ -72,8 +74,21 @@ const transaction = createNft(umi, {
   },
 });
 
-await transaction.sendAndConfirm(umi, { send: { commitment: "finalized" } })
+const metadata = findMetadataPda(umi, { mint: nftTokenMintKeypair.publicKey });
+const verifyCollectionTransaction = verifyCollectionV1(umi, {
+    metadata,
+    collectionMint: nftCollection,
+    authority: umi.identity,
+});
+
+// hack to add a wrapped transaction
+verifyCollectionTransaction.mapInstructions((instruction) => {
+    createNftTransaction = createNftTransaction.add(instruction);
+
+    return instruction;
+});
+
+await createNftTransaction.sendAndConfirm(umi);
 
 const explorerLink = getExplorerLink("address", nftTokenMintKeypair.publicKey, "devnet");
-console.log(`NFT Token explorer link:  ${explorerLink}`);
-console.log(`NFT Token Address:  ${nftTokenMintKeypair.publicKey.toString()}`);
+console.log(`NFT Token created and verified:  ${explorerLink}`);
